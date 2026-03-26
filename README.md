@@ -1,5 +1,6 @@
-title: thebarberdotcom backend
-emoji: ✂
+---
+title: thebarberdotcom
+emoji: 💈
 colorFrom: purple
 colorTo: yellow
 sdk: docker
