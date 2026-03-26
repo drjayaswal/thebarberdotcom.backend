@@ -48,7 +48,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=os.getenv("PROJECT_NAME", "TheBarberDotCom API"),
     lifespan=lifespan,
-    # redirect_slashes=False
+    redirect_slashes=False
 )
 
 app.add_middleware(
@@ -64,6 +64,14 @@ app.include_router(barbers_router, prefix="/barbers")
 app.include_router(seats_router, prefix="/seats")
 app.include_router(bookings_router, prefix="/bookings")
 app.include_router(reviews_router, prefix="/reviews")
+
+@app.get("/")
+async def root():
+    return {
+        "message": "thebarberdotcom running",
+        "docs": "/docs",
+        "status": "healthy"
+    }
 
 @app.get("/health")
 async def health_check():

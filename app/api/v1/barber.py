@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, Query, Path, Body
 
 router = APIRouter()
 
-@router.get("/")
+@router.get("")
 def get_barbers(
     lat: Optional[float] = Query(None),
     long: Optional[float] = Query(None),
