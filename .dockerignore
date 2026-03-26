@@ -1,0 +1,17 @@
+# --- Python (FastAPI & ML) ---
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+build/
+dist/
+*.egg-info/
+.env
+*.pyc
+*.log
+
+# --- Git files ---
+.git
+.gitignore
