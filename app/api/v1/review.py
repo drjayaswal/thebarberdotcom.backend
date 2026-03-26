@@ -28,7 +28,7 @@ def recalc_barber_rating(barber_id: str, db: Session):
     })
     db.commit()
 
-@router.post("/")
+@router.post("")
 def create_review(
     body: Dict[str, Any] = Body(...),
     db: Session = Depends(get_db),

@@ -8,17 +8,18 @@ from app.models.schema import Barber, Seat
 from app.api.v1.auth import get_current_user
 from sqlalchemy import func, or_, and_, cast, Numeric
 from fastapi import APIRouter, Depends, Query, Path, Body
+from sqlalchemy import or_, and_, cast, Numeric, func, select, column
 
 router = APIRouter()
-
 @router.get("")
-def get_barbers(
+async def get_barbers(
     lat: Optional[float] = Query(None),
     long: Optional[float] = Query(None),
-    radius: float = Query(50000),
+    radius: float = Query(10),
     searchQuery: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
+    radius_in_meters = radius * 1000
     try:
         has_coords = lat is not None and long is not None
         
@@ -44,32 +45,34 @@ def get_barbers(
         )
 
         conditions = []
+        
         if has_coords:
             user_point = func.ST_SetSRID(func.ST_Point(long, lat), 4326)
             conditions.append(
                 func.ST_DWithin(
                     cast(Barber.location, Geography),
                     cast(user_point, Geography),
-                    radius
+                    radius_in_meters
                 )
             )
-
         if searchQuery and searchQuery.strip():
             pattern = f"%{searchQuery}%"
+            service_alias = func.jsonb_array_elements(Barber.services).alias("service_item")
+            json_search = select(1).select_from(service_alias).where(
+                column("service_item").op("->>")("name").ilike(pattern)
+            ).correlate(Barber).exists()
+
             conditions.append(
                 or_(
                     Barber.shop_name.ilike(pattern),
                     Barber.name.ilike(pattern),
                     Barber.address.ilike(pattern),
-                    func.exists().where(
-                        func.jsonb_array_elements(Barber.services).column_slice("name").astext.ilike(pattern)
-                    )
+                    json_search
                 )
             )
 
         if conditions:
             query = query.filter(and_(*conditions))
-
         if has_coords:
             query = query.order_by("distance")
         else:
@@ -112,8 +115,11 @@ def get_barbers(
         return {"success": True, "data": data_with_seats}
 
     except Exception as e:
-        print(f"Error: {e}")
-        return JSONResponse(status_code=500, content={"success": False, "error": "Internal Server Error"})
+        print(f"Error in get_barbers: {e}")
+        return JSONResponse(
+            status_code=500, 
+            content={"success": False, "error": "Internal Server Error"}
+        )
 
 @router.get("/{id}")
 def get_barber_by_id(id: str = Path(...), db: Session = Depends(get_db)):

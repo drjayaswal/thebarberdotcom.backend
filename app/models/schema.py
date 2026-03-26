@@ -44,7 +44,7 @@ class Barber(SQLModel, table=True):
     profile_pic: Optional[str] = None
     shop_name: str
     address: str
-    
+    shop_images: List[str] = Field(default=[], sa_column=Column(JSON))
     # JSONB columns
     services: List[Dict[str, Any]] = Field(default=[], sa_column=Column(JSON))
     timings: Dict[str, Any] = Field(sa_column=Column(JSON))
