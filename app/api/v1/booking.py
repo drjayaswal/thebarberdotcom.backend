@@ -18,7 +18,7 @@ from app.utils.mail import (
 router = APIRouter()
 IST = ZoneInfo("Asia/Kolkata")
 
-@router.get("/")
+@router.get("")
 def get_bookings(
     customerId: Optional[str] = Query(None),
     barberId: Optional[str] = Query(None),
