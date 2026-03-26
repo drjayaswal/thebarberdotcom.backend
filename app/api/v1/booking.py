@@ -88,7 +88,7 @@ def get_bookings(
     except Exception as e:
         return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
 
-@router.post("/")
+@router.post("")
 def create_booking(
     background_tasks: BackgroundTasks,
     body: Dict[str, Any] = Body(...),
