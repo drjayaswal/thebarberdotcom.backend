@@ -97,6 +97,7 @@ async def get_barbers(
                 "rating": r.Barber.rating,
                 "profilePic": r.Barber.profile_pic,
                 "services": r.Barber.services,
+                "timings": r.Barber.timings,
                 "shop_images": r.Barber.shop_images,
                 "totalSeats": r.Barber.total_seats,
                 "lat": r.lat,
