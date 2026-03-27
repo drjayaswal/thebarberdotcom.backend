@@ -147,6 +147,7 @@ def booking_info_block(slot: datetime, barber: Any, service: str, price: str, se
     """
 
 def send_booking_confirmation_mail(booking_id: str, db: Session):
+    print("3")
     booking = db.query(Booking).filter(Booking.id == booking_id).first()
     if not (b := booking): return
     cust = db.query(Customer).filter(Customer.id == b.customer_id).first()
