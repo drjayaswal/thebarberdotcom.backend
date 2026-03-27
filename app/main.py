@@ -14,6 +14,7 @@ from app.tasks.reminders import check_and_send_reminders
 
 from app.api.v1.auth import router as auth_router
 from app.api.v1.seat import router as seats_router
+from app.api.v1.saved import router as saved_router
 from app.api.v1.upload import router as upload_router
 from app.api.v1.barber import router as barbers_router
 from app.api.v1.review import router as reviews_router
@@ -65,6 +66,7 @@ app.include_router(seats_router, prefix="/seats")
 app.include_router(upload_router, prefix="/upload")
 app.include_router(reviews_router, prefix="/reviews")
 app.include_router(barbers_router, prefix="/barbers")
+app.include_router(saved_router, prefix="/saved")
 app.include_router(bookings_router, prefix="/bookings")
 
 @app.get("/")

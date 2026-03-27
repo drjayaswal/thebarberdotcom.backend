@@ -1,5 +1,7 @@
 import enum
 from datetime import datetime
+from pydantic import field_serializer
+from geoalchemy2.shape import to_shape
 from typing import Optional, List, Dict, Any
 from sqlmodel import SQLModel, Field, Column, JSON, Numeric
 from geoalchemy2 import Geometry
@@ -33,7 +35,6 @@ class Customer(SQLModel, table=True):
     penalty: float = Field(default=0.00, sa_column=Column(Numeric(10, 2)))
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-# 4. Barber Model
 class Barber(SQLModel, table=True):
     __tablename__ = "barbers"
     id: str = Field(primary_key=True)
@@ -45,16 +46,21 @@ class Barber(SQLModel, table=True):
     shop_name: str
     address: str
     shop_images: List[str] = Field(default=[], sa_column=Column(JSON))
-    # JSONB columns
     services: List[Dict[str, Any]] = Field(default=[], sa_column=Column(JSON))
     timings: Dict[str, Any] = Field(sa_column=Column(JSON))
     
-    # PostGIS Geometry (Point, SRID 4326)
     location: Any = Field(sa_column=Column(Geometry(geometry_type='POINT', srid=4326)))
     
     rating: float = Field(default=0.00, sa_column=Column(Numeric(3, 2)))
     total_seats: int = Field(default=1)
     total_reviews: int = Field(default=0)
+
+    @field_serializer("location")
+    def serialize_location(self, location: Any):
+        if location is None:
+            return None
+        shape = to_shape(location)
+        return {"longitude": shape.x, "latitude": shape.y}
 
 # 5. Booking Model
 class Booking(SQLModel, table=True):
