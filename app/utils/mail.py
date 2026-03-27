@@ -76,7 +76,8 @@ def send_template_mail(to: str, subject: str, title: str, greeting: str, body_ht
     msg.attach(MIMEText(html, 'html'))
     print("6")
     try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as server:
+            server.starttls()
             server.login(sender_email, password)
             server.sendmail(sender_email, to, msg.as_string())
         print("7")
