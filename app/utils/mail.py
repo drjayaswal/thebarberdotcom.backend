@@ -1,26 +1,19 @@
 import os
-import smtplib
+import resend
 from datetime import datetime
 from sqlalchemy.orm import Session
 from typing import Any
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from geoalchemy2.shape import to_shape
 from app.models.schema import Customer, Barber, Booking
 from app.core.config import settings
 
 get_settings = settings()
+resend.api_key = get_settings.RESEND_API_KEY
 
-def send_template_mail(to: str, subject: str, title: str, greeting: str, body_html: str, footer_note: str = ""):
-    sender_email = get_settings.APP_MAIL
-    password = get_settings.APP_PASSWORD
-    if not sender_email or not password:
+def send_template_mail(to: str, subject: str, title: str, greeting: str, body_html: str, footer_note: str = ""):    
+    if not resend.api_key:
+        print("Resend Error: RESEND_API_KEY is missing")
         return
-
-    msg = MIMEMultipart('alternative')
-    msg['From'] = f"thebarberdotcom <{sender_email}>"
-    msg['To'] = to
-    msg['Subject'] = subject
 
     html = f"""
     <!DOCTYPE html>
@@ -52,9 +45,7 @@ def send_template_mail(to: str, subject: str, title: str, greeting: str, body_ht
                             <td class="content" style="padding: 32px 48px 48px 48px;">
                                 <h1 style="margin:0 0 12px;font-size:24px;font-weight:700;color:#0f172a;letter-spacing:-0.025em;">{title}</h1>
                                 <p style="margin:0 0 32px;font-size:16px;line-height:1.6;color:#475569;">{greeting}</p>
-                                
                                 {body_html}
-
                                 {f'<p style="margin-top:32px;font-size:13px;line-height:1.5;color:#94a3b8;">{footer_note}</p>' if footer_note else ""}
                             </td>
                         </tr>
@@ -72,31 +63,27 @@ def send_template_mail(to: str, subject: str, title: str, greeting: str, body_ht
     </body>
     </html>
     """
-    msg.attach(MIMEText(html, 'html'))
+
     try:
-        print(f"Attempting to connect to SMTP for {to}...")
-        with smtplib.SMTP("smtp.gmail.com", 587, timeout=10) as server:
-            server.starttls() 
-            server.login(sender_email, password)
-            server.sendmail(sender_email, to, msg.as_string())
-        print("7: Email sent successfully")
-    except OSError as e:
-        if e.errno == 101:
-            print("CRITICAL: Port 587 is blocked by the host network (Hugging Face).")
-        else:
-            print(f"Network Error: {e}")
+        params = {
+            "from": "thebarberdotcom <onboarding@resend.dev>",
+            "to": [to],
+            "subject": subject,
+            "html": html,
+        }
+        r = resend.Emails.send(params)
     except Exception as e:
-        print(f"SMTP Error: {e}")
+        print(f"Resend API Error: {e}")
 
 def booking_info_block(slot: datetime, barber: Any, service: str, price: str, seat_number: int, show_buttons: bool = True):
     formatted_time = slot.strftime("%A, %B %d • %I:%M %p")
-    
     map_url = "https://maps.google.com"
     try:
         if barber.location:
             point = to_shape(barber.location)
             map_url = f"https://www.google.com/maps/search/?api=1&query={point.y},{point.x}"
     except: pass
+    
     buttons_html = ""
     if show_buttons:
         buttons_html = f"""
@@ -165,16 +152,14 @@ def send_booking_cancellation_mail(booking_id: str, db: Session):
     if not (b := booking): return
     cust = db.query(Customer).filter(Customer.id == b.customer_id).first()
     barb = db.query(Barber).filter(Barber.id == b.barber_id).first()
-    
     content = booking_info_block(b.slot, barb, b.service, b.price, b.seat_number, show_buttons=False)
-    send_template_mail(cust.email, "Booking Cancelled", "Appointment Cancelled", f"Hello {cust.name}, your reservation has been successfully cancelled. The following session is now available for others:", content)
+    send_template_mail(cust.email, "Booking Cancelled", "Appointment Cancelled", f"Hello {cust.name}, your reservation has been successfully cancelled.", content)
 
 def send_booking_cancellation_with_penalty_mail(booking_id: str, db: Session):
     booking = db.query(Booking).filter(Booking.id == booking_id).first()
     if not (b := booking): return
     cust = db.query(Customer).filter(Customer.id == b.customer_id).first()
     barb = db.query(Barber).filter(Barber.id == b.barber_id).first()
-    
     fine = "{:.2f}".format(float(b.price) * 0.2)
     penalty_html = f"""
     <div style="margin-top:20px;padding:16px;background-color:#fff1f2;border:1px solid #fda4af;border-radius:8px;text-align:center;">
@@ -183,13 +168,12 @@ def send_booking_cancellation_with_penalty_mail(booking_id: str, db: Session):
     </div>
     """
     content = booking_info_block(b.slot, barb, b.service, b.price, b.seat_number, show_buttons=False) + penalty_html
-    send_template_mail(cust.email, "Cancellation Penalty Applied", "Important: Cancellation Fee", f"Hi {cust.name}, as this cancellation occurred within our 2-hour window, a penalty has been added to your account per our shop policy.", content)
+    send_template_mail(cust.email, "Cancellation Penalty Applied", "Important: Cancellation Fee", f"Hi {cust.name}, a penalty has been added to your account per our shop policy.", content)
 
 def send_booking_reminder_mail(booking_id: str, minutes_before: int, db: Session):
     booking = db.query(Booking).filter(Booking.id == booking_id).first()
     if not (b := booking): return
     cust = db.query(Customer).filter(Customer.id == b.customer_id).first()
     barb = db.query(Barber).filter(Barber.id == b.barber_id).first()
-    
     content = booking_info_block(b.slot, barb, b.service, b.price, b.seat_number, show_buttons=True)
-    send_template_mail(cust.email, "Reminder: Appointment Soon", "See you shortly!", f"Hi {cust.name}, just a friendly reminder that your session at {barb.shop_name} starts in {minutes_before} minutes.", content)
+    send_template_mail(cust.email, "Reminder: Appointment Soon", "See you shortly!", f"Hi {cust.name}, your session at {barb.shop_name} starts in {minutes_before} minutes.", content)

@@ -1,7 +1,7 @@
 import uuid
 from sqlalchemy.orm import Session
 from typing import Dict, Any, Optional
-from sqlalchemy import desc, and_, func
+from sqlalchemy import desc, and_
 from fastapi.responses import JSONResponse
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -17,6 +17,14 @@ from app.utils.mail import (
 
 router = APIRouter()
 IST = ZoneInfo("Asia/Kolkata")
+
+def parse_slot(slot_str: str) -> datetime:
+    if "Z" in slot_str:
+        utc_dt = datetime.fromisoformat(slot_str.replace("Z", "+00:00"))
+        return utc_dt.astimezone(IST).replace(tzinfo=None)
+    if "T" in slot_str:
+        return datetime.strptime(slot_str.split(".")[0], "%Y-%m-%dT%H:%M:%S")
+    return datetime.strptime(slot_str, "%Y-%m-%d %H:%M:%S")
 
 @router.get("")
 def get_bookings(
@@ -47,8 +55,8 @@ def get_bookings(
             Customer.name.label("customer_name"),
             Customer.phone_number.label("customer_phoneNumber"),
             Customer.profile_pic.label("customer_profilePic")
-        ).join(Barber, Booking.barber_id == Barber.id)\
-         .join(Customer, Booking.customer_id == Customer.id)
+        ).outerjoin(Barber, Booking.barber_id == Barber.id)\
+         .outerjoin(Customer, Booking.customer_id == Customer.id)
 
         if customerId:
             query = query.filter(Booking.customer_id == customerId)
@@ -110,16 +118,7 @@ def create_booking(
                 return JSONResponse(status_code=409, content={"success": False, "error": "Seat is already occupied"})
 
             booking_id = str(uuid.uuid4())
-            
-            slot_str = body.get("slot")
-            if "Z" in slot_str:
-                utc_dt = datetime.fromisoformat(slot_str.replace("Z", "+00:00"))
-                dt_obj = utc_dt.astimezone(IST).replace(tzinfo=None)
-            else:
-                if "T" in slot_str:
-                    dt_obj = datetime.strptime(slot_str.split(".")[0], "%Y-%m-%dT%H:%M:%S")
-                else:
-                    dt_obj = datetime.strptime(slot_str, "%Y-%m-%d %H:%M:%S")
+            dt_obj = parse_slot(body.get("slot"))
 
             new_booking = Booking(
                 id=booking_id,
@@ -137,13 +136,11 @@ def create_booking(
             )
 
             db.add(new_booking)
-            
             seat.is_occupied = True
             seat.current_booking_id = booking_id
 
         db.commit()
-
-        background_tasks.add_task(send_booking_confirmation_mail, booking_id, db)
+        background_tasks.add_task(send_booking_confirmation_mail, booking_id, next(get_db()))
         
         return {"success": True, "data": {"id": booking_id, "status": BookingStatus.confirmed}}
     except Exception as e:
@@ -171,32 +168,22 @@ def update_booking(
 
         if is_cancelling:
             now = datetime.now(IST).replace(tzinfo=None)
-            slot_time = booking.slot
-            time_diff = slot_time - now
+            time_diff = booking.slot - now
             
             if timedelta(hours=0) < time_diff < timedelta(hours=2):
                 booking.is_penalized = True
                 fine = float(booking.price) * 0.20
-                db.query(Customer).filter(Customer.id == booking.customer_id).update({
-                    "penalty": Customer.penalty + fine
-                })
-                background_tasks.add_task(send_booking_cancellation_with_penalty_mail, id, db)
+                db.query(Customer).filter(Customer.id == booking.customer_id).update(
+                    {"penalty": Customer.penalty + fine},
+                    synchronize_session=False
+                )
+                background_tasks.add_task(send_booking_cancellation_with_penalty_mail, id, next(get_db()))
             else:
-                background_tasks.add_task(send_booking_cancellation_mail, id, db)
+                background_tasks.add_task(send_booking_cancellation_mail, id, next(get_db()))
 
         if body.get("note") is not None: booking.note = body["note"]
         if new_status: booking.status = new_status
-        if body.get("slot"): 
-            slot_str = body["slot"]
-            if "Z" in slot_str:
-                utc_dt = datetime.fromisoformat(slot_str.replace("Z", "+00:00"))
-                booking.slot = utc_dt.astimezone(IST).replace(tzinfo=None)
-            else:
-                if "T" in slot_str:
-                    booking.slot = datetime.strptime(slot_str.split(".")[0], "%Y-%m-%dT%H:%M:%S")
-                else:
-                    booking.slot = datetime.strptime(slot_str, "%Y-%m-%d %H:%M:%S")
-        
+        if body.get("slot"): booking.slot = parse_slot(body["slot"])
         if is_finishing: booking.completed_at = datetime.now(IST).replace(tzinfo=None)
         
         booking.updated_at = datetime.now(IST).replace(tzinfo=None)
@@ -205,7 +192,7 @@ def update_booking(
             db.query(Seat).filter(Seat.current_booking_id == id).update({
                 "is_occupied": False,
                 "current_booking_id": None
-            })
+            }, synchronize_session=False)
 
         db.commit()
         return {"success": True, "data": {"id": id, "status": booking.status}}
@@ -224,7 +211,7 @@ def delete_booking(id: str = Path(...), db: Session = Depends(get_db)):
             db.query(Seat).filter(Seat.current_booking_id == id).update({
                 "is_occupied": False,
                 "current_booking_id": None
-            })
+            }, synchronize_session=False)
 
         db.delete(booking)
         db.commit()

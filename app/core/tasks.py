@@ -22,10 +22,10 @@ def run_daily_maintenance():
             )
             session.execute(stmt)
             session.commit()
-            print("Daily maintenance: Auto-completed past bookings.")
+            print("daily maintenance: auto-completed past bookings")
         except Exception as e:
             session.rollback()
-            print(f"Daily maintenance cron failed: {e}")
+            print(f"daily maintenance cron failed: {e}")
 
 def run_booking_reminders():
     with SessionLocal() as session:
@@ -47,14 +47,14 @@ def run_booking_reminders():
                 diff = (booking_slot - now).total_seconds()
                 if 3000 <= diff <= 4200 and not booking.reminder_60_sent: 
                     booking.reminder_60_sent = True
-                    print(f"Sending 60min reminder for booking ID: {booking.id}")
+                    print(f"sending 60min reminder for booking ID: {booking.id}")
                 elif 1200 <= diff <= 2400 and not booking.reminder_30_sent:
                     booking.reminder_30_sent = True
-                    print(f"Sending 30min reminder for booking ID: {booking.id}")
+                    print(f"sending 30min reminder for booking ID: {booking.id}")
             session.commit()
         except Exception as e:
             session.rollback()
-            print(f"Booking reminders cron failed: {e}")
+            print(f"booking reminders cron failed: {e}")
 
 def start_tasks():
     scheduler.add_job(run_daily_maintenance, "cron", hour=0, minute=0)

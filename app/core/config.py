@@ -5,7 +5,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     JWT_SECRET: str
     NEXT_PUBLIC_APP_URL: str
-    APP_PASSWORD: str
+    RESEND_API_KEY: str
     APP_MAIL: str
     PROJECT_NAME: str = "thebarberdotcom"
     API_V1_STR: str = "/api/v1"
