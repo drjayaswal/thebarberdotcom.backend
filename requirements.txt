@@ -17,3 +17,4 @@ resend==2.26.0
 fastapi-mail==1.4.1
 jinja2==3.1.6
 httpx==0.28.1
+sqlmodel==0.0.37
