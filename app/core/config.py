@@ -7,8 +7,6 @@ class Settings(BaseSettings):
     NEXT_PUBLIC_APP_URL: str
     APP_PASSWORD: str
     APP_MAIL: str
-    HF_ACCESS_TOKEN: str
-    BUCKET_ID: str
     PROJECT_NAME: str = "thebarberdotcom"
     API_V1_STR: str = "/api/v1"
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
