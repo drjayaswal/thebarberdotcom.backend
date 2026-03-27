@@ -142,10 +142,9 @@ def create_booking(
             seat.current_booking_id = booking_id
 
         db.commit()
-        print("1")        
-        background_tasks.add_task(send_booking_confirmation_mail, booking_id, db)
-        print("8")        
 
+        background_tasks.add_task(send_booking_confirmation_mail, booking_id, db)
+        
         return {"success": True, "data": {"id": booking_id, "status": BookingStatus.confirmed}}
     except Exception as e:
         db.rollback()
