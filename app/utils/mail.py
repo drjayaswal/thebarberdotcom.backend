@@ -14,7 +14,7 @@ get_settings = settings()
 def send_template_mail(to: str, subject: str, title: str, greeting: str, body_html: str, footer_note: str = ""):
     sender_email = get_settings.APP_MAIL
     password = get_settings.APP_PASSWORD
-    
+    print("5")
     if not sender_email or not password:
         return
 
@@ -74,11 +74,12 @@ def send_template_mail(to: str, subject: str, title: str, greeting: str, body_ht
     </html>
     """
     msg.attach(MIMEText(html, 'html'))
-
+    print("6")
     try:
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(sender_email, password)
             server.sendmail(sender_email, to, msg.as_string())
+        print("7")
     except Exception as e:
         print(f"SMTP Error: {e}")
 
@@ -91,7 +92,7 @@ def booking_info_block(slot: datetime, barber: Any, service: str, price: str, se
             point = to_shape(barber.location)
             map_url = f"https://www.google.com/maps/search/?api=1&query={point.y},{point.x}"
     except: pass
-    
+    print("4")
     buttons_html = ""
     if show_buttons:
         buttons_html = f"""
@@ -147,14 +148,15 @@ def booking_info_block(slot: datetime, barber: Any, service: str, price: str, se
     """
 
 def send_booking_confirmation_mail(booking_id: str, db: Session):
-    print("3")
+    print("2")
     booking = db.query(Booking).filter(Booking.id == booking_id).first()
     if not (b := booking): return
     cust = db.query(Customer).filter(Customer.id == b.customer_id).first()
     barb = db.query(Barber).filter(Barber.id == b.barber_id).first()
     if not (cust and barb): return
-    
+    print("3")
     content = booking_info_block(b.slot, barb, b.service, b.price, b.seat_number, show_buttons=True)
+    print("4")
     send_template_mail(cust.email, "Booking Confirmed", "Your seat is reserved.", f"Hi {cust.name}, your appointment at {barb.shop_name} is confirmed. We've booked seat number {b.seat_number} for you.", content)
 
 def send_booking_cancellation_mail(booking_id: str, db: Session):
