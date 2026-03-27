@@ -14,6 +14,7 @@ from app.tasks.reminders import check_and_send_reminders
 
 from app.api.v1.auth import router as auth_router
 from app.api.v1.seat import router as seats_router
+from app.api.v1.upload import router as upload_router
 from app.api.v1.barber import router as barbers_router
 from app.api.v1.review import router as reviews_router
 from app.api.v1.booking import router as bookings_router
@@ -34,7 +35,7 @@ async def lifespan(app: FastAPI):
         id="reminder_check_task",
         func=check_and_send_reminders,
         trigger="interval",
-        seconds=60*20,
+        seconds=60*10,
         replace_existing=True
     )
     scheduler.start()
@@ -60,10 +61,11 @@ app.add_middleware(
 )
 
 app.include_router(auth_router, prefix="/auth")
-app.include_router(barbers_router, prefix="/barbers")
 app.include_router(seats_router, prefix="/seats")
-app.include_router(bookings_router, prefix="/bookings")
+app.include_router(upload_router, prefix="/upload")
 app.include_router(reviews_router, prefix="/reviews")
+app.include_router(barbers_router, prefix="/barbers")
+app.include_router(bookings_router, prefix="/bookings")
 
 @app.get("/")
 async def root():

@@ -14,11 +14,11 @@ def run_daily_maintenance():
                 update(Booking)
                 .where(
                     and_(
-                        Booking.status == BookingStatus.CONFIRMED,
+                        Booking.status == BookingStatus.confirmed,
                         Booking.slot <= now
                     )
                 )
-                .values(status=BookingStatus.AUTO_COMPLETED, updated_at=now)
+                .values(status=BookingStatus.auto_completed, updated_at=now)
             )
             session.execute(stmt)
             session.commit()
@@ -31,12 +31,14 @@ def run_booking_reminders():
     with SessionLocal() as session:
         try:
             now = datetime.now(timezone.utc)
-            in_65_min = now + timedelta(minutes=65)
+            in_75_min = now + timedelta(minutes=75)
+            
             stmt = select(Booking).where(
                 and_(
-                    Booking.status == BookingStatus.CONFIRMED,
+                    Booking.status == BookingStatus.confirmed,
                     Booking.slot >= now,
-                    Booking.slot <= in_65_min
+                    Booking.slot <= in_75_min,
+                    Booking.reminder_60_sent == False
                 )
             )
 
@@ -45,12 +47,11 @@ def run_booking_reminders():
             for booking in upcoming_bookings:
                 booking_slot = booking.slot.replace(tzinfo=timezone.utc) if booking.slot.tzinfo is None else booking.slot
                 diff = (booking_slot - now).total_seconds()
-                if 3000 <= diff <= 4200 and not booking.reminder_60_sent: 
+                
+                if 3300 <= diff <= 4500: 
                     booking.reminder_60_sent = True
                     print(f"sending 60min reminder for booking ID: {booking.id}")
-                elif 1200 <= diff <= 2400 and not booking.reminder_30_sent:
-                    booking.reminder_30_sent = True
-                    print(f"sending 30min reminder for booking ID: {booking.id}")
+                    
             session.commit()
         except Exception as e:
             session.rollback()
@@ -58,6 +59,6 @@ def run_booking_reminders():
 
 def start_tasks():
     scheduler.add_job(run_daily_maintenance, "cron", hour=0, minute=0)
-    scheduler.add_job(run_booking_reminders, "interval", minutes=30)
+    scheduler.add_job(run_booking_reminders, "interval", minutes=15)
     scheduler.start()
     print("background tasks started successfully")

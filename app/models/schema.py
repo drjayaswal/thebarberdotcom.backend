@@ -70,7 +70,6 @@ class Booking(SQLModel, table=True):
     is_penalized: bool = Field(default=False)
     completed_at: Optional[datetime] = None
     reminder_60_sent: bool = Field(default=False)
-    reminder_30_sent: bool = Field(default=False)
     seat_number: int
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)

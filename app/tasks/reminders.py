@@ -26,25 +26,8 @@ def check_and_send_reminders():
                 b.reminder_60_sent = True
                 db.commit()
             except Exception as e:
+                db.rollback()
                 print(f"Error sending 60m reminder for {b.id}: {e}")
-                db.rollback()
-
-        remind_30_time = now + timedelta(minutes=30)
-        bookings_30 = db.query(Booking).filter(
-            Booking.status == BookingStatus.confirmed,
-            Booking.reminder_30_sent == False,
-            Booking.slot <= remind_30_time,
-            Booking.slot > now
-        ).all()
-
-        for b in bookings_30:
-            try:
-                send_booking_reminder_mail(b.id, 30, db)
-                b.reminder_30_sent = True
-                db.commit()
-            except Exception as e:
-                print(f"Error sending 30m reminder for {b.id}: {e}")
-                db.rollback()
 
     except Exception as e:
         print(f"Reminder Task Error: {e}")

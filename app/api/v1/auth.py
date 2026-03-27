@@ -177,6 +177,7 @@ def get_profile(user: Any = Depends(get_current_user), db: Session = Depends(get
                     "phoneNumber": barber.phone_number,
                     "shopName": barber.shop_name,
                     "address": barber.address,
+                    "shop_images": barber.shop_images,
                     "profilePic": getattr(barber, 'profile_pic', None),
                     "role": "barber"
                 }
@@ -186,3 +187,48 @@ def get_profile(user: Any = Depends(get_current_user), db: Session = Depends(get
             status_code=500,
             content={"success": False, "error": f"Internal Server Error: {str(e)}"}
         )
+
+@router.patch("/update")
+def update_profile(
+    id: str, 
+    body: Dict[str, Any] = Body(...), 
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(get_current_user)
+):
+    role = body.get("role")
+    
+    if role == "customer":
+        user = db.query(Customer).filter(Customer.id == id).first()
+    else:
+        user = db.query(Barber).filter(Barber.id == id).first()
+
+    if not user:
+        return JSONResponse(status_code=404, content={"success": False, "error": "User not found"})
+
+    if "name" in body: user.name = body["name"]
+    if "phoneNumber" in body: user.phone_number = body["phoneNumber"]
+    if "profilePic" in body: user.profile_pic = body["profilePic"]
+    
+    if role == "barber" and "shop_images" in body:
+        user.shop_images = body["shop_images"]
+
+    try:
+        db.commit()
+        db.refresh(user)
+        
+        return {
+            "success": True,
+            "data": {
+                "id": user.id,
+                "name": user.name,
+                "email": user.email,
+                "phoneNumber": user.phone_number,
+                "profilePic": getattr(user, 'profile_pic', None),
+                "role": role,
+                "shop_images": getattr(user, 'shop_images', []) if role == "barber" else None,
+                "penalty": getattr(user, 'penalty', 0) if role == "customer" else None
+            }
+        }
+    except Exception as e:
+        db.rollback()
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
