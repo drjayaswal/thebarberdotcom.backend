@@ -29,7 +29,7 @@ class Customer(SQLModel, table=True):
     password: str
     profile_pic: Optional[str] = None
     phone_number: Optional[str] = None
-    refresh_token: Optional[str] = None
+    reset_token: Optional[str] = None
     access_token: Optional[str] = None
     fcm_token: Optional[str] = None
     penalty: float = Field(default=0.00, sa_column=Column(Numeric(10, 2)))
@@ -52,7 +52,8 @@ class Barber(SQLModel, table=True):
     rating: float = Field(default=0.00, sa_column=Column(Numeric(3, 2)))
     total_seats: int = Field(default=1)
     total_reviews: int = Field(default=0)
-
+    reset_token: Optional[str] = None
+    
     @field_serializer("location")
     def serialize_location(self, location: Any):
         if location is None:

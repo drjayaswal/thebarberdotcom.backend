@@ -145,7 +145,14 @@ def send_booking_confirmation_mail(booking_id: str, db: Session):
     barb = db.query(Barber).filter(Barber.id == b.barber_id).first()
     if not (cust and barb): return
     content = booking_info_block(b.slot, barb, b.service, b.price, b.seat_number, show_buttons=True)
-    send_template_mail(cust.email, "Booking Confirmed", "Your seat is reserved.", f"Hi {cust.name}, your appointment at {barb.shop_name} is confirmed. We've booked seat number {b.seat_number} for you.", content)
+    send_template_mail(
+        to=cust.email,
+        subject="Booking Confirmed",
+        title="Your seat is reserved.",
+        greeting=f"Hi {cust.name},",
+        body_html=content,
+        footer_note="This is an automated message. Please do not reply to this email."
+    )
 
 def send_booking_cancellation_mail(booking_id: str, db: Session):
     booking = db.query(Booking).filter(Booking.id == booking_id).first()
@@ -153,7 +160,14 @@ def send_booking_cancellation_mail(booking_id: str, db: Session):
     cust = db.query(Customer).filter(Customer.id == b.customer_id).first()
     barb = db.query(Barber).filter(Barber.id == b.barber_id).first()
     content = booking_info_block(b.slot, barb, b.service, b.price, b.seat_number, show_buttons=False)
-    send_template_mail(cust.email, "Booking Cancelled", "Appointment Cancelled", f"Hello {cust.name}, your reservation has been successfully cancelled.", content)
+    send_template_mail(
+        to=cust.email,
+        subject="Booking Cancelled",
+        title="Appointment Cancelled",
+        greeting=f"Hello {cust.name},",
+        body_html=content,
+        footer_note="This is an automated message. Please do not reply to this email."
+    )
 
 def send_booking_cancellation_with_penalty_mail(booking_id: str, db: Session):
     booking = db.query(Booking).filter(Booking.id == booking_id).first()
@@ -168,4 +182,62 @@ def send_booking_cancellation_with_penalty_mail(booking_id: str, db: Session):
     </div>
     """
     content = booking_info_block(b.slot, barb, b.service, b.price, b.seat_number, show_buttons=False) + penalty_html
-    send_template_mail(cust.email, "Cancellation Penalty Applied", "Important: Cancellation Fee", f"Hi {cust.name}, a penalty has been added to your account per our shop policy.", content)
+    send_template_mail(
+        to=cust.email,
+        subject="Cancellation Penalty Applied",
+        title="Important: Cancellation Fee",
+        greeting=f"Hi {cust.name},",
+        body_html=content,
+        footer_note="This is an automated message. Please do not reply to this email."
+    )
+
+def send_forgot_password_mail(user_id: str, token: str, db: Session):
+    user = db.query(Customer).filter(Customer.id == user_id).first()
+    if not user:
+        user = db.query(Barber).filter(Barber.id == user_id).first()
+    if not user: return
+
+    frontend_base = get_settings.NEXT_PUBLIC_APP_URL
+    reset_link = f"{frontend_base}/reset-password?token={token}"
+
+    body_html = f"""
+    <div style="background-color:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:24px;">
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
+            <tr>
+                <td style="padding-bottom:20px;border-bottom:1px solid #f1f5f9;">
+                    <div style="font-size:11px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">Account Security</div>
+                    <div style="font-size:18px;color:#0f172a;font-weight:700;">Reset Your Password</div>
+                </td>
+            </tr>
+            <tr>
+                <td style="padding:20px 0;">
+                    <p style="margin:0;font-size:15px;color:#475569;line-height:1.6;">
+                        We received a request to reset the password for your THEBARBERDOTCOM account. Click the button below to choose a new password.
+                    </p>
+                </td>
+            </tr>
+            <tr>
+                <td align="center" style="padding:10px 0 20px 0;">
+                    <a href="{reset_link}" target="_blank" style="display:inline-block;background-color:#0f172a;color:#ffffff;text-align:center;padding:14px 32px;text-decoration:none;border-radius:8px;font-size:14px;font-weight:600;">Reset Password</a>
+                </td>
+            </tr>
+            <tr>
+                <td style="padding-top:20px;border-top:1px solid #f1f5f9;">
+                    <div style="font-size:12px;color:#94a3b8;line-height:1.5;">
+                        If you're having trouble clicking the button, copy and paste this link into your browser:<br>
+                        <a href="{reset_link}" style="color:#3b82f6;text-decoration:none;word-break:break-all;">{reset_link}</a>
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </div>
+    """
+    send_template_mail(
+        to=user.email,
+        subject="Password Reset Request",
+        title="Reset Your Password",
+        greeting=f"Hi {user.name},",
+        body_html=body_html,
+        footer_note="This link will expire in 24 hours. If you did not request this change, you can safely ignore this email."
+    )
+    

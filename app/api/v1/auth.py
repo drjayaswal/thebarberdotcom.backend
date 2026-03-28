@@ -1,12 +1,18 @@
 import uuid
 from typing import Dict, Any
+from pydantic import BaseModel
 from app.database.db import get_db
 from sqlalchemy.orm import Session
 from fastapi.responses import JSONResponse
 from geoalchemy2.elements import WKTElement
-from fastapi import APIRouter, Depends, Body
+from fastapi import APIRouter, Depends, Body, BackgroundTasks
 from app.models.schema import Customer, Barber, Seat
+from app.utils.mail import send_forgot_password_mail
 from app.core.security import get_password_hash, verify_password, create_access_token,get_current_user
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    newPassword: str
 
 router = APIRouter()
 
@@ -193,7 +199,6 @@ def update_profile(
     id: str, 
     body: Dict[str, Any] = Body(...), 
     db: Session = Depends(get_db),
-    current_user: Any = Depends(get_current_user)
 ):
     role = body.get("role")
     
@@ -232,3 +237,82 @@ def update_profile(
     except Exception as e:
         db.rollback()
         return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+
+@router.post("/forgot-password")
+def forgot_password(
+    background_tasks: BackgroundTasks,
+    body: Dict[str, Any] = Body(...), 
+    db: Session = Depends(get_db)
+):
+    email = body.get("email")
+    if not email:
+        return JSONResponse(status_code=400, content={"success": False, "error": "Email is required"})
+
+    user = db.query(Customer).filter(Customer.email == email).first()
+    role = "customer"
+    
+    if not user:
+        user = db.query(Barber).filter(Barber.email == email).first()
+        role = "barber"
+        
+    if not user:
+        return JSONResponse(status_code=404, content={"success": False, "error": "User with this email does not exist"})
+
+    token = create_access_token(user.id, role)
+
+    user.reset_token = token
+    db.commit()
+
+    background_tasks.add_task(send_forgot_password_mail, user.id, token, next(get_db()))
+    
+    return {
+        "success": True,
+        "message": "Password reset instructions have been sent to your email."
+    }
+
+@router.post("/verify-reset-token")
+def verify_reset_token(
+    body: Dict[str, Any] = Body(...),
+    db: Session = Depends(get_db)
+):
+    token = body.get("token")
+    if not token:
+        return JSONResponse(status_code=400, content={"success": False, "error": "Token is required"})
+
+    user = db.query(Customer).filter(Customer.reset_token == token).first()
+    
+    if not user:
+        user = db.query(Barber).filter(Barber.reset_token == token).first()
+
+    if not user:
+        return JSONResponse(status_code=401, content={"success": False, "error": "Invalid reset token"})
+
+    return {
+        "success": True,
+        "message": "Reset token is valid"
+    }
+
+@router.post("/reset-password")
+def reset_password(
+    data: ResetPasswordRequest,
+    db: Session = Depends(get_db)
+):
+    user = db.query(Customer).filter(Customer.reset_token == data.token).first()
+    
+    if not user:
+        user = db.query(Barber).filter(Barber.reset_token == data.token).first()
+
+    if not user:
+        return JSONResponse(
+            status_code=404, 
+            content={"success": False, "error": "Invalid or expired reset token"}
+        )
+
+    user.password = get_password_hash(data.newPassword)
+    user.reset_token = None
+    db.commit()
+
+    return {
+        "success": True,
+        "message": "Password has been reset successfully"
+    }
