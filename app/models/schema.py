@@ -11,7 +11,7 @@ class BookingStatus(str, enum.Enum):
     confirmed = "confirmed"
     canceled = "canceled"
     completed = "completed"
-    auto_completed = "auto-completed"
+    auto = "auto"
 
 
 # 2. Saved Barbers (Many-to-Many Link Table)
@@ -48,9 +48,7 @@ class Barber(SQLModel, table=True):
     shop_images: List[str] = Field(default=[], sa_column=Column(JSON))
     services: List[Dict[str, Any]] = Field(default=[], sa_column=Column(JSON))
     timings: Dict[str, Any] = Field(sa_column=Column(JSON))
-    
     location: Any = Field(sa_column=Column(Geometry(geometry_type='POINT', srid=4326)))
-    
     rating: float = Field(default=0.00, sa_column=Column(Numeric(3, 2)))
     total_seats: int = Field(default=1)
     total_reviews: int = Field(default=0)
@@ -75,7 +73,6 @@ class Booking(SQLModel, table=True):
     note: Optional[str] = None
     is_penalized: bool = Field(default=False)
     completed_at: Optional[datetime] = None
-    reminder_60_sent: bool = Field(default=False)
     seat_number: int
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)

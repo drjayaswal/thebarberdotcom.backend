@@ -50,7 +50,7 @@ def create_review(
         if booking.customer_id != customer_id:
             return JSONResponse(status_code=403, content={"success": False, "error": "Unauthorized"})
 
-        if booking.status not in ["completed", "auto-completed"]:
+        if booking.status not in ["completed", "auto"]:
             return JSONResponse(status_code=400, content={"success": False, "error": "Can only review completed bookings"})
 
         existing = db.query(Review).filter(Review.booking_id == booking_id).first()

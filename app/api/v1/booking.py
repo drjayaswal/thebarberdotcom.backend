@@ -163,8 +163,8 @@ def update_booking(
         new_status = BookingStatus(raw_status) if raw_status else None
         
         is_cancelling = new_status == BookingStatus.canceled and booking.status != BookingStatus.canceled
-        is_finishing = new_status in [BookingStatus.completed, BookingStatus.auto_completed] and \
-                      booking.status not in [BookingStatus.completed, BookingStatus.auto_completed]
+        is_finishing = new_status in [BookingStatus.completed, BookingStatus.auto] and \
+                      booking.status not in [BookingStatus.completed, BookingStatus.auto]
 
         if is_cancelling:
             now = datetime.now(IST).replace(tzinfo=None)

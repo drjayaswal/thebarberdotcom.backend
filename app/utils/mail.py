@@ -169,11 +169,3 @@ def send_booking_cancellation_with_penalty_mail(booking_id: str, db: Session):
     """
     content = booking_info_block(b.slot, barb, b.service, b.price, b.seat_number, show_buttons=False) + penalty_html
     send_template_mail(cust.email, "Cancellation Penalty Applied", "Important: Cancellation Fee", f"Hi {cust.name}, a penalty has been added to your account per our shop policy.", content)
-
-def send_booking_reminder_mail(booking_id: str, minutes_before: int, db: Session):
-    booking = db.query(Booking).filter(Booking.id == booking_id).first()
-    if not (b := booking): return
-    cust = db.query(Customer).filter(Customer.id == b.customer_id).first()
-    barb = db.query(Barber).filter(Barber.id == b.barber_id).first()
-    content = booking_info_block(b.slot, barb, b.service, b.price, b.seat_number, show_buttons=True)
-    send_template_mail(cust.email, "Reminder: Appointment Soon", "See you shortly!", f"Hi {cust.name}, your session at {barb.shop_name} starts in {minutes_before} minutes.", content)

@@ -1,4 +1,5 @@
 import os
+import logging
 from pathlib import Path
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
@@ -9,8 +10,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from app.database.db import init_db
 from app.core.config import settings
-from app.core.tasks import start_tasks
-from app.tasks.reminders import check_and_send_reminders
+from app.core.tasks import register_tasks
 
 from app.api.v1.auth import router as auth_router
 from app.api.v1.seat import router as seats_router
@@ -26,26 +26,28 @@ load_dotenv(dotenv_path=env_path)
 env = settings()
 scheduler = BackgroundScheduler()
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
+
+scheduler = BackgroundScheduler()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
     
-    start_tasks()
-    
-    scheduler.add_job(
-        id="reminder_check_task",
-        func=check_and_send_reminders,
-        trigger="interval",
-        seconds=60*10,
-        replace_existing=True
-    )
+    register_tasks(scheduler)
     scheduler.start()
-    print("checking reminders every 20 minutes")
+    logger.info("scheduler started")
     
     yield
     
-    print("shutting down services...")
+    logger.info("scheduler stopped")
     scheduler.shutdown()
+
 
 app = FastAPI(
     title=os.getenv("PROJECT_NAME", "TheBarberDotCom API"),
@@ -63,10 +65,10 @@ app.add_middleware(
 
 app.include_router(auth_router, prefix="/auth")
 app.include_router(seats_router, prefix="/seats")
+app.include_router(saved_router, prefix="/saved")
 app.include_router(upload_router, prefix="/upload")
 app.include_router(reviews_router, prefix="/reviews")
 app.include_router(barbers_router, prefix="/barbers")
-app.include_router(saved_router, prefix="/saved")
 app.include_router(bookings_router, prefix="/bookings")
 
 @app.get("/")
