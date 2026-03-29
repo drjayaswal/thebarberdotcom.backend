@@ -200,27 +200,27 @@ def update_profile(
     body: Dict[str, Any] = Body(...), 
     db: Session = Depends(get_db),
 ):
-    role = body.get("role")
-    
-    if role == "customer":
-        user = db.query(Customer).filter(Customer.id == id).first()
-    else:
-        user = db.query(Barber).filter(Barber.id == id).first()
-
-    if not user:
-        return JSONResponse(status_code=404, content={"success": False, "error": "User not found"})
-
-    if "name" in body: user.name = body["name"]
-    if "phoneNumber" in body: user.phone_number = body["phoneNumber"]
-    if "profilePic" in body: user.profile_pic = body["profilePic"]
-    
-    if role == "barber" and "shop_images" in body:
-        user.shop_images = body["shop_images"]
-
     try:
+        role = body.get("role")
+        
+        if role == "customer":
+            user = db.query(Customer).filter(Customer.id == id).first()
+        else:
+            user = db.query(Barber).filter(Barber.id == id).first()
+
+        if not user:
+            return JSONResponse(status_code=404, content={"success": False, "error": "User not found"})
+
+        if "name" in body: user.name = body["name"]
+        if "phoneNumber" in body: user.phone_number = body["phoneNumber"]
+        if "profilePic" in body: user.profile_pic = body["profilePic"]
+        
+        if role == "barber" and "shop_images" in body:
+            user.shop_images = body["shop_images"]
+
         db.commit()
         db.refresh(user)
-        
+
         return {
             "success": True,
             "data": {
@@ -236,7 +236,10 @@ def update_profile(
         }
     except Exception as e:
         db.rollback()
-        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+        return JSONResponse(
+            status_code=500, 
+            content={"success": False, "error": f"Internal Server Error: {str(e)}"}
+        )
 
 @router.post("/forgot-password")
 def forgot_password(
@@ -244,75 +247,94 @@ def forgot_password(
     body: Dict[str, Any] = Body(...), 
     db: Session = Depends(get_db)
 ):
-    email = body.get("email")
-    if not email:
-        return JSONResponse(status_code=400, content={"success": False, "error": "Email is required"})
+    try:
+        email = body.get("email")
+        if not email:
+            return JSONResponse(status_code=400, content={"success": False, "error": "Email is required"})
 
-    user = db.query(Customer).filter(Customer.email == email).first()
-    role = "customer"
-    
-    if not user:
-        user = db.query(Barber).filter(Barber.email == email).first()
-        role = "barber"
+        user = db.query(Customer).filter(Customer.email == email).first()
+        role = "customer"
         
-    if not user:
-        return JSONResponse(status_code=404, content={"success": False, "error": "User with this email does not exist"})
+        if not user:
+            user = db.query(Barber).filter(Barber.email == email).first()
+            role = "barber"
+            
+        if not user:
+            return JSONResponse(status_code=404, content={"success": False, "error": "User with this email does not exist"})
 
-    token = create_access_token(user.id, role)
+        token = create_access_token(user.id, role)
 
-    user.reset_token = token
-    db.commit()
+        user.reset_token = token
+        db.commit()
 
-    background_tasks.add_task(send_forgot_password_mail, user.id, token, next(get_db()))
-    
-    return {
-        "success": True,
-        "message": "Password reset instructions have been sent to your email."
-    }
+        background_tasks.add_task(send_forgot_password_mail, user.id, token, next(get_db()))
+        
+        return {
+            "success": True,
+            "message": "Password reset instructions have been sent to your email."
+        }
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": f"Internal Server Error: {str(e)}"}
+        )
 
 @router.post("/verify-reset-token")
 def verify_reset_token(
     body: Dict[str, Any] = Body(...),
     db: Session = Depends(get_db)
 ):
-    token = body.get("token")
-    if not token:
-        return JSONResponse(status_code=400, content={"success": False, "error": "Token is required"})
+    try:
+        token = body.get("token")
+        if not token:
+            return JSONResponse(status_code=400, content={"success": False, "error": "Token is required"})
 
-    user = db.query(Customer).filter(Customer.reset_token == token).first()
-    
-    if not user:
-        user = db.query(Barber).filter(Barber.reset_token == token).first()
+        user = db.query(Customer).filter(Customer.reset_token == token).first()
+        
+        if not user:
+            user = db.query(Barber).filter(Barber.reset_token == token).first()
 
-    if not user:
-        return JSONResponse(status_code=401, content={"success": False, "error": "Invalid reset token"})
+        if not user:
+            return JSONResponse(status_code=401, content={"success": False, "error": "Invalid reset token"})
 
-    return {
-        "success": True,
-        "message": "Reset token is valid"
-    }
+        return {
+            "success": True,
+            "message": "Reset token is valid"
+        }
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": f"Internal Server Error: {str(e)}"}
+        )
 
 @router.post("/reset-password")
 def reset_password(
     data: ResetPasswordRequest,
     db: Session = Depends(get_db)
 ):
-    user = db.query(Customer).filter(Customer.reset_token == data.token).first()
-    
-    if not user:
-        user = db.query(Barber).filter(Barber.reset_token == data.token).first()
+    try:
+        user = db.query(Customer).filter(Customer.reset_token == data.token).first()
+        
+        if not user:
+            user = db.query(Barber).filter(Barber.reset_token == data.token).first()
 
-    if not user:
+        if not user:
+            return JSONResponse(
+                status_code=404, 
+                content={"success": False, "error": "Invalid or expired reset token"}
+            )
+
+        user.password = get_password_hash(data.newPassword)
+        user.reset_token = None
+        db.commit()
+
+        return {
+            "success": True,
+            "message": "Password has been reset successfully"
+        }
+    except Exception as e:
+        db.rollback()
         return JSONResponse(
-            status_code=404, 
-            content={"success": False, "error": "Invalid or expired reset token"}
+            status_code=500,
+            content={"success": False, "error": f"Internal Server Error: {str(e)}"}
         )
-
-    user.password = get_password_hash(data.newPassword)
-    user.reset_token = None
-    db.commit()
-
-    return {
-        "success": True,
-        "message": "Password has been reset successfully"
-    }
